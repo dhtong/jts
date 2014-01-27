@@ -1,4 +1,4 @@
-package jtsext.polytriangulate;
+package com.vividsolutions.jts.polytriangulate;
 
 import com.vividsolutions.jts.geom.*;
 

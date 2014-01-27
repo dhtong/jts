@@ -1,4 +1,4 @@
-package jtsext.polytriangulate.tri;
+package com.vividsolutions.jts.polytriangulate.tri;
 
 import com.vividsolutions.jts.algorithm.CGAlgorithms;
 import com.vividsolutions.jts.geom.Coordinate;

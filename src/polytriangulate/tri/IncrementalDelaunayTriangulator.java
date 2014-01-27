@@ -31,7 +31,7 @@
  *     www.vividsolutions.com
  */
 
-package jtsext.polytriangulate.tri;
+package com.vividsolutions.jts.polytriangulate.tri;
 
 import java.util.Collection;
 import java.util.Iterator;

@@ -1,4 +1,4 @@
-package jtsext.polytriangulate;
+package com.vividsolutions.jts.polytriangulate;
 
 public class PolygonTriangle {
 
@@ -58,6 +58,7 @@ public class PolygonTriangle {
                 if (vertices[i] == other.vertices[j]) {
                     count++;
                     shared[i] = true;
+                    break;
                 }
             }
         }
