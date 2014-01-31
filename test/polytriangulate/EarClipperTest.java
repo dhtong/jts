@@ -51,7 +51,7 @@ public class EarClipperTest extends TestCase {
         int numOfSide = 10;
         Coordinate[] coordinates = getRegularCoordinates(length, numOfSide);
         Polygon poly = createRegularPoly(coordinates);
-        GeometryCollection expected = getExpectedRegularGeo(coordinates);
+        GeometryCollection expected = getExpectedRegularGeo(coordinates.clone());
         runCompare(poly, expected);
     }
     
