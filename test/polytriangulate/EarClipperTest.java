@@ -1,7 +1,5 @@
 package com.vividsolutions.jts.polytriangulate;
 
-import java.util.ArrayList;
-
 import junit.framework.TestCase;
 
 import com.vividsolutions.jts.geom.Coordinate;
@@ -10,7 +8,6 @@ import com.vividsolutions.jts.geom.GeometryCollection;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LinearRing;
 import com.vividsolutions.jts.geom.Polygon;
-import com.vividsolutions.jts.geom.Triangle;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKTReader;
 import com.vividsolutions.jts.io.WKTWriter;
@@ -25,7 +22,7 @@ public class EarClipperTest extends TestCase {
     public EarClipperTest(String name) {
         super(name);
     }
-
+    
     public void testTriangle() throws ParseException {
         String triangleStr = "POLYGON ((10 20, 10 10, 20 20, 10 20))";
         String expected = "GEOMETRYCOLLECTION (POLYGON ((10 10, 20 20, 10 20, 10 10)))";
@@ -55,7 +52,59 @@ public class EarClipperTest extends TestCase {
         runCompare(poly, expected);
     }
     
-    public GeometryCollection getExpectedRegularGeo(Coordinate[] coordinates){
+    public void testTriangleWithHoles() throws ParseException {
+        triangleWithHolesHelper(1);
+        triangleWithHolesHelper(2);
+        triangleWithHolesHelper(4);
+    }
+    
+    public void triangleWithHolesHelper(int numOfHoles) throws ParseException {
+        LinearRing outter = getOutterTri();
+        LinearRing[] holes = getHoles(numOfHoles);
+        Polygon poly = new Polygon(outter, holes, fact);
+        unionEqualsOrigin(runEarClip(poly), poly);
+        unionEqualsOrigin(runEarClip(poly, true), poly);
+    }
+    
+    protected LinearRing[] getHoles(int numOfHoles) throws ParseException {
+        String[] holeStr = new String[4];
+        holeStr[0] = "LINEARRING(-1 0, 0 0, -1 1, -1 0)";
+        holeStr[1] = "LINEARRING(1 2, 0 1, 1 1, 1 2)";
+        holeStr[2] = "LINEARRING(-1 2, 0 2, 0 3, -1 2)";
+        holeStr[3] = "LINEARRING(3 0, 4 0, 3 1, 3 0)";
+        LinearRing[] ring = new LinearRing[numOfHoles];
+        for(int i =0; i < numOfHoles; i++) {
+            ring[i] = (LinearRing) reader.read(holeStr[i]);
+        }
+        return ring;
+    }
+    
+    protected LinearRing getOutterTri() throws ParseException {
+        String tri = "LINEARRING(-2 -1, 5 0, 0 6, -2 -1)";
+        return (LinearRing) reader.read(tri);
+    }
+    
+    /**
+     * Check if there is overlap among earclipped triangles. Then union them
+     * back to one polygon and compare with the original.
+     * @param result    EarClipped polygon
+     * @param original  Before applying EarClipper
+     */
+    protected void unionEqualsOrigin(Geometry result, Geometry original) {
+        int size = result.getNumGeometries();
+        Geometry union = result.getGeometryN(0);
+        for(int i = 1; i < size; i++){
+            Geometry current = result.getGeometryN(i);
+            if(!union.overlaps(current)){
+                union = union.union(current);
+            }
+        }
+        original.normalize();
+        union.normalize();
+        assertTrue(original.equalsExact(union, COMPARISON_TOLERANCE));
+    }
+    
+    protected GeometryCollection getExpectedRegularGeo(Coordinate[] coordinates){
         int size = coordinates.length - 2 - 1;
         Polygon[] array = new Polygon[size];
         for(int i = 0; i < size; i++){
@@ -111,7 +160,6 @@ public class EarClipperTest extends TestCase {
 
     protected void runCompare(Geometry sitesGeo, Geometry expected) {
         Geometry result = runEarClip(sitesGeo);
-        System.out.println(result);
         result.normalize();
         expected.normalize();
         assertTrue(expected.equalsExact(result, COMPARISON_TOLERANCE));
