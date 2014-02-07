@@ -13,16 +13,15 @@ import com.vividsolutions.jts.io.WKTReader;
 import com.vividsolutions.jts.io.WKTWriter;
 
 public class EarClipperTest extends TestCase {
-
     protected WKTReader reader = new WKTReader();
     protected WKTWriter writer = new WKTWriter();
     static final double COMPARISON_TOLERANCE = 1.0e-7;
     GeometryFactory fact = new GeometryFactory();
-    
+
     public EarClipperTest(String name) {
         super(name);
     }
-    
+
     public void testTriangle() throws ParseException {
         String triangleStr = "POLYGON ((10 20, 10 10, 20 20, 10 20))";
         String expected = "GEOMETRYCOLLECTION (POLYGON ((10 10, 20 20, 10 20, 10 10)))";
@@ -35,15 +34,25 @@ public class EarClipperTest extends TestCase {
                 + "POLYGON ((2 2, 3 -1, 6 0, 2 2)))";
         runCompare(squareStr, expected);
     }
-    
+
     public void testRectangle() throws ParseException {
         String rectStr = "POLYGON ((10 20, 10 10, 30 10, 30 20, 10 20))";
         String expected = "GEOMETRYCOLLECTION (POLYGON ((10 10, 30 20, 30 10, 10 10)), "
                 + "POLYGON ((10 10, 30 20, 10 20, 10 10)))";
         runCompare(rectStr, expected);
     }
-    
-    public void testRegularPolygon() throws ParseException{
+
+    public void testRandomConvex() throws ParseException {
+        String poly = "POLYGON ((150 330, 250 370, 324 366, 380 340, 430 150, 300 110, 130 220, 150 330))";
+        unionEqualsOrigin(poly);
+    }
+
+    public void testRandomConcave() throws ParseException {
+        String poly = "POLYGON ((190 400, 200 150, 210 380, 320 370, 260 290, 430 250, 260 260, 475 144, 180 20, 40 190, 20 310, 140 320, 190 400))";
+        unionEqualsOrigin(poly);
+    }
+
+    public void testRegularPolygon() throws ParseException {
         int length = 11;
         int numOfSide = 10;
         Coordinate[] coordinates = getRegularCoordinates(length, numOfSide);
@@ -51,13 +60,13 @@ public class EarClipperTest extends TestCase {
         GeometryCollection expected = getExpectedRegularGeo(coordinates.clone());
         runCompare(poly, expected);
     }
-    
+
     public void testTriangleWithHoles() throws ParseException {
         triangleWithHolesHelper(1);
         triangleWithHolesHelper(2);
         triangleWithHolesHelper(4);
     }
-    
+
     public void triangleWithHolesHelper(int numOfHoles) throws ParseException {
         LinearRing outter = getOutterTri();
         LinearRing[] holes = getHoles(numOfHoles);
@@ -65,7 +74,7 @@ public class EarClipperTest extends TestCase {
         unionEqualsOrigin(runEarClip(poly), poly);
         unionEqualsOrigin(runEarClip(poly, true), poly);
     }
-    
+
     protected LinearRing[] getHoles(int numOfHoles) throws ParseException {
         String[] holeStr = new String[4];
         holeStr[0] = "LINEARRING(-1 0, 0 0, -1 1, -1 0)";
@@ -73,29 +82,32 @@ public class EarClipperTest extends TestCase {
         holeStr[2] = "LINEARRING(-1 2, 0 2, 0 3, -1 2)";
         holeStr[3] = "LINEARRING(3 0, 4 0, 3 1, 3 0)";
         LinearRing[] ring = new LinearRing[numOfHoles];
-        for(int i =0; i < numOfHoles; i++) {
+        for (int i = 0; i < numOfHoles; i++) {
             ring[i] = (LinearRing) reader.read(holeStr[i]);
         }
         return ring;
     }
-    
+
     protected LinearRing getOutterTri() throws ParseException {
         String tri = "LINEARRING(-2 -1, 5 0, 0 6, -2 -1)";
         return (LinearRing) reader.read(tri);
     }
-    
+
     /**
      * Check if there is overlap among earclipped triangles. Then union them
      * back to one polygon and compare with the original.
-     * @param result    EarClipped polygon
-     * @param original  Before applying EarClipper
+     * 
+     * @param result
+     *            EarClipped polygon
+     * @param original
+     *            Before applying EarClipper
      */
     protected void unionEqualsOrigin(Geometry result, Geometry original) {
         int size = result.getNumGeometries();
         Geometry union = result.getGeometryN(0);
-        for(int i = 1; i < size; i++){
+        for (int i = 1; i < size; i++) {
             Geometry current = result.getGeometryN(i);
-            if(!union.overlaps(current)){
+            if (!union.overlaps(current)) {
                 union = union.union(current);
             }
         }
@@ -103,58 +115,68 @@ public class EarClipperTest extends TestCase {
         union.normalize();
         assertTrue(original.equalsExact(union, COMPARISON_TOLERANCE));
     }
-    
-    protected GeometryCollection getExpectedRegularGeo(Coordinate[] coordinates){
+
+    protected void unionEqualsOrigin(String original) throws ParseException {
+        Geometry geo = reader.read(original);
+        unionEqualsOrigin(runEarClip(geo), geo.union());
+    }
+
+    protected GeometryCollection getExpectedRegularGeo(Coordinate[] coordinates) {
         int size = coordinates.length - 2 - 1;
         Polygon[] array = new Polygon[size];
-        for(int i = 0; i < size; i++){
-            Coordinate[] tmp = {coordinates[0], coordinates[i+1], coordinates[i+2], coordinates[0]};
+        for (int i = 0; i < size; i++) {
+            Coordinate[] tmp = { coordinates[0], coordinates[i + 1],
+                    coordinates[i + 2], coordinates[0] };
             LinearRing ring = new GeometryFactory().createLinearRing(tmp);
             array[i] = new Polygon(ring, null, fact);
         }
         return new GeometryCollection(array, fact);
     }
-    
-    protected Polygon createRegularPoly(Coordinate[] coordinates) {       
+
+    protected Polygon createRegularPoly(Coordinate[] coordinates) {
         LinearRing linear = new GeometryFactory().createLinearRing(coordinates);
         Polygon poly = new Polygon(linear, null, fact);
         poly.normalize();
         return poly;
     }
-    
+
     /**
      * Create "random" regular polygon based on edge length and number of edges
+     * 
      * @param length
      * @param numOfSide
      * @return
      */
     protected Coordinate[] getRegularCoordinates(int length, int numOfSide) {
         Coordinate[] ring = new Coordinate[numOfSide + 1];
-        int x = (int)Math.random()*10;
-        int y = (int)Math.random()*10;
-        //relative angle, depended on the shape
-        double addAngle = Math.toRadians(180 - ((double)(180 * (numOfSide - 2))) / numOfSide);      
+        // always pass origin point for now
+        int x = 0;
+        int y = 0;
+        // relative angle, depended on the shape
+        double addAngle = Math.toRadians(180
+                - ((double) (180 * (numOfSide - 2))) / numOfSide);
         ring[0] = new Coordinate(x, y);
         ring[1] = new Coordinate(x, y + length);
         ring[numOfSide] = new Coordinate(x, y);
-        for(int i = 1; i < numOfSide - 1; i++) {
-            double angle = getAngle(ring[i].x - ring[i - 1].x, ring[i].y - ring[i - 1].y) 
+        for (int i = 1; i < numOfSide - 1; i++) {
+            double angle = getAngle(ring[i].x - ring[i - 1].x, ring[i].y
+                    - ring[i - 1].y)
                     + addAngle;
             double newX = ring[i].x + length * Math.cos(angle);
             double newY = ring[i].y + length * Math.sin(angle);
-            ring[i+1] = new Coordinate(newX, newY);
+            ring[i + 1] = new Coordinate(newX, newY);
         }
         return ring;
     }
-    
+
     protected double getAngle(double x, double y) {
-        if(x == 0 && y > 0)
+        if (x == 0 && y > 0)
             return Math.PI / 2;
-        if(x == 0 && y < 0)
+        if (x == 0 && y < 0)
             return Math.PI * 3 / 2;
         double angle = Math.atan(y / x);
-        if(x < 0)
-            angle += Math.PI;            
+        if (x < 0)
+            angle += Math.PI;
         return angle;
     }
 
@@ -164,22 +186,21 @@ public class EarClipperTest extends TestCase {
         expected.normalize();
         assertTrue(expected.equalsExact(result, COMPARISON_TOLERANCE));
     }
-    
+
     protected void runCompare(String sitesWKT, String expectedWKT)
             throws ParseException {
         Geometry sitesGeo = reader.read(sitesWKT);
         Geometry expected = reader.read(expectedWKT);
         runCompare(sitesGeo, expected);
     }
-    
+
     protected Geometry runEarClip(Geometry g) {
         return runEarClip(g, false);
     }
 
     protected Geometry runEarClip(Geometry g, boolean improve) {
         // extract first polygon
-        Polygon poly = (Polygon) g.getGeometryN(0);
-        EarClipper clipper = new EarClipper(poly);
+        EarClipper clipper = new EarClipper((Polygon) g.getGeometryN(0));
         clipper.setImprove(improve);
         Geometry ears = clipper.getResult();
         return ears;
