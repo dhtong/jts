@@ -63,34 +63,21 @@ public class EarClipperTest extends TestCase {
 
     public void testTriangleWithHoles() throws ParseException {
         triangleWithHolesHelper(1);
-        triangleWithHolesHelper(2);
-        triangleWithHolesHelper(4);
+        // triangleWithHolesHelper(2);
+        // triangleWithHolesHelper(4);
     }
 
     public void triangleWithHolesHelper(int numOfHoles) throws ParseException {
-        LinearRing outter = getOutterTri();
-        LinearRing[] holes = getHoles(numOfHoles);
-        Polygon poly = new Polygon(outter, holes, fact);
-        unionEqualsOrigin(runEarClip(poly), poly);
-        unionEqualsOrigin(runEarClip(poly, true), poly);
+        unionEqualsOrigin(getHoles(numOfHoles));
     }
 
-    protected LinearRing[] getHoles(int numOfHoles) throws ParseException {
+    protected String getHoles(int numOfHoles) throws ParseException {
         String[] holeStr = new String[4];
-        holeStr[0] = "LINEARRING(-1 0, 0 0, -1 1, -1 0)";
-        holeStr[1] = "LINEARRING(1 2, 0 1, 1 1, 1 2)";
-        holeStr[2] = "LINEARRING(-1 2, 0 2, 0 3, -1 2)";
-        holeStr[3] = "LINEARRING(3 0, 4 0, 3 1, 3 0)";
-        LinearRing[] ring = new LinearRing[numOfHoles];
-        for (int i = 0; i < numOfHoles; i++) {
-            ring[i] = (LinearRing) reader.read(holeStr[i]);
-        }
-        return ring;
-    }
-
-    protected LinearRing getOutterTri() throws ParseException {
-        String tri = "LINEARRING(-2 -1, 5 0, 0 6, -2 -1)";
-        return (LinearRing) reader.read(tri);
+        holeStr[0] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0))";
+        holeStr[1] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0), (1 2, 0 1, 1 1, 1 2))";
+        holeStr[2] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0), (1 2, 0 1, 1 1, 1 2), (-1 2, 0 2, 0 3, -1 2))";
+        holeStr[0] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (4 0, 4 1, 3 0, 4 0))";
+        return holeStr[numOfHoles - 1];
     }
 
     /**

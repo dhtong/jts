@@ -63,7 +63,7 @@ public class EarClipper {
      */
     private Geometry triangulate() {
         triList = new ArrayList<PolygonTriangle>();
-        createShell();
+        createShell();  
         computeEars();
         // improve triangulation if required
         if (isImprove) {
@@ -126,8 +126,10 @@ public class EarClipper {
             }
         } while (!finished);
     }
+
     /**
      * Check if the inputs are in the same line
+     * 
      * @param a
      * @param b
      * @param c
