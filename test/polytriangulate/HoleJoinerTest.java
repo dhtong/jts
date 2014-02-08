@@ -41,7 +41,7 @@ public class HoleJoinerTest extends TestCase {
         Coordinate[] coords = poly.getExteriorRing().getCoordinates();
         ArrayList<Coordinate> shellCoords = new ArrayList<Coordinate>();
         shellCoords.addAll(Arrays.asList(coords));
-        HoleJoinerLM holeJoiner = new HoleJoinerLM(inputPrepGeom);
+        HoleJoiner holeJoiner = new HoleJoiner(inputPrepGeom);
         holeJoiner.joinHoles(shellCoords);
         Coordinate[] coorArray = shellCoords.toArray(new Coordinate[0]);
         Polygon tmp = gf.createPolygon(gf.createLinearRing(coorArray));
