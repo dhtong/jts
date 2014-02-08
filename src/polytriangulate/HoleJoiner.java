@@ -13,19 +13,27 @@ import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 
-class HoleJoiner {
+public class HoleJoiner {
     private static final double EPS = 1.0E-4;
     private final GeometryFactory gf;
     private PreparedGeometry inputPrepGeom;
     private List<Coordinate> shellCoords;
+    // orderedCoords a copy of shellCoords for sort purpose
+    private List<Coordinate> orderedCoords;
 
     public HoleJoiner(PreparedGeometry inputPrepGeom) {
         this.inputPrepGeom = inputPrepGeom;
         gf = inputPrepGeom.getGeometry().getFactory();
+        orderedCoords = new ArrayList<Coordinate>();
     }
 
+    /**
+     * @param shellCoords
+     *            Shell Coordinates of the polygon.
+     */
     public void joinHoles(List<Coordinate> shellCoords) {
         this.shellCoords = shellCoords;
+        orderedCoords.addAll(shellCoords);
         List<Geometry> orderedHoles = getOrderedHoles((Polygon) inputPrepGeom
                 .getGeometry());
         for (int i = 0; i < orderedHoles.size(); i++) {
@@ -34,81 +42,86 @@ class HoleJoiner {
     }
 
     /**
-     * Join a given hole to the current shell. The hole coordinates are inserted
-     * into the list of shell coordinates.
+     * Join the current hole to the polygon
      * 
      * @param hole
-     *            the hole to join
      */
     private void joinHoleToShell(Geometry hole) {
-        double minD2 = Double.MAX_VALUE;
-        int shellVertexIndex = -1;
-        final int Ns = shellCoords.size() - 1;
-        final int holeVertexIndex = getLowestVertex(hole);
         final Coordinate[] holeCoords = hole.getCoordinates();
-        final Coordinate ch = holeCoords[holeVertexIndex];
-        List<IndexedDouble> distanceList = new ArrayList<IndexedDouble>();
-        /*
-         * Note: it's important to scan the shell vertices in reverse so that if
-         * a hole ends up being joined to what was originally another hole, the
-         * previous hole's coordinates appear in the shell before the new hole's
-         * coordinates (otherwise the triangulation algorithm tends to get
-         * stuck).
-         */
-        for (int i = Ns - 1; i >= 0; i--) {
-            Coordinate cs = shellCoords.get(i);
-            double d2 = (ch.x - cs.x) * (ch.x - cs.x) + (ch.y - cs.y)
-                    * (ch.y - cs.y);
-            if (d2 < minD2) {
-                minD2 = d2;
-                shellVertexIndex = i;
-            }
-            distanceList.add(new IndexedDouble(i, d2));
-        }
-        /*
-         * Try a quick join: if the closest shell vertex is reachable without
-         * crossing any holes.
-         */
-        LineString join = gf.createLineString(new Coordinate[] { ch,
-                shellCoords.get(shellVertexIndex) });
-        if (inputPrepGeom.covers(join)) {
-            doJoinHole(shellVertexIndex, holeCoords, holeVertexIndex);
-            return;
-        }
-        /*
-         * Quick join didn't work. Sort the shell coords on distance to the hole
-         * vertex and choose the closest reachable one.
-         */
-        Collections.sort(distanceList, new IndexedDoubleComparator());
-        for (int i = 1; i < distanceList.size(); i++) {
-            join = gf.createLineString(new Coordinate[] { ch,
-                    shellCoords.get(distanceList.get(i).index) });
-            if (inputPrepGeom.covers(join)) {
-                shellVertexIndex = distanceList.get(i).index;
-                doJoinHole(shellVertexIndex, holeCoords, holeVertexIndex);
-                return;
-            }
-        }
-        throw new IllegalStateException("Failed to join hole to shell");
+        final int holeVertexIndex = getLeftMostVertex(hole);
+        final Coordinate holeCoord = holeCoords[holeVertexIndex];
+        Coordinate shellCoord = getLeftShellVertex(holeCoord);
+        int shellVertexIndex = getIndexInShellCoords(shellCoord);
+        doJoinHole(shellVertexIndex, holeCoords, holeVertexIndex);
     }
 
     /**
-     * Helper method for joinHoleToShell. Insert the hole coordinates into the
-     * shell coordinate list.
+     * Find the index of the coordinate in ShellCoords ArrayList
      * 
-     * @param shellCoords
-     *            list of current shell coordinates
+     * @param coord
+     * @return
+     */
+    private int getIndexInShellCoords(Coordinate coord) {
+        for (int i = 0; i < shellCoords.size(); i++) {
+            if (shellCoords.get(i).equals2D(coord, EPS)) {
+                return i;
+            }
+        }
+        throw new IllegalStateException("Request vertex is not in sheelcoords");
+    }
+
+    /**
+     * Find the shell coordinate which is 1. closest to the left most vertex of
+     * the hole 2. on the left of the hole 3. lingstring is covered 4. in
+     * ShellCoords list
+     * 
+     * @param holeCoord
+     * @return
+     */
+    private Coordinate getLeftShellVertex(Coordinate holeCoord) {
+        Collections.sort(orderedCoords);
+        double holeX = holeCoord.x;
+        int prevBiggest = 0;
+        // Advanced approach needed here.
+        while (orderedCoords.get(prevBiggest).x < holeX) {
+            ++prevBiggest;
+        }
+        do {
+            --prevBiggest;
+        } while (!joinAble(holeCoord, orderedCoords.get(prevBiggest))
+                && prevBiggest >= 0);
+        if (prevBiggest < 0)
+            throw new IllegalStateException(
+                    "Failed to find vertex on shell to join");
+        return orderedCoords.get(prevBiggest);
+    }
+
+    /**
+     * Determine if a linestring between two coordinates is covered
+     * 
+     * @param holeCoord
+     * @param shellCoord
+     * @return
+     */
+    private boolean joinAble(Coordinate holeCoord, Coordinate shellCoord) {
+        LineString join = gf.createLineString(new Coordinate[] { holeCoord,
+                shellCoord });
+        if (inputPrepGeom.covers(join)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Add holeCoords to proper position. update ShellCoords and OrderedCoords
+     * 
      * @param shellVertexIndex
-     *            insertion point in the shell coordinate list
      * @param holeCoords
-     *            array of hole coordinates
      * @param holeVertexIndex
-     *            attachment point of hole
      */
     private void doJoinHole(int shellVertexIndex, Coordinate[] holeCoords,
             int holeVertexIndex) {
         List<Coordinate> newCoords = new ArrayList<Coordinate>();
-        List<Integer> newRingIndices = new ArrayList<Integer>();
         newCoords.add(new Coordinate(shellCoords.get(shellVertexIndex)));
         final int N = holeCoords.length - 1;
         int i = holeVertexIndex;
@@ -118,93 +131,56 @@ class HoleJoiner {
         } while (i != holeVertexIndex);
         newCoords.add(new Coordinate(holeCoords[holeVertexIndex]));
         shellCoords.addAll(shellVertexIndex, newCoords);
+        orderedCoords.addAll(newCoords);
     }
 
     /**
-     * Returns a list of holes in the input polygon (if any) ordered by y
-     * coordinate with ties broken using x coordinate.
+     * Ordered the holes by left most vertex's x value.
      * 
-     * @param poly
-     *            input polygon
-     * @return a list of Geometry objects representing the ordered holes (may be
-     *         empty)
+     * @param poly  polygon that contains all the holes.
+     * @return      list of ordered hole geometry
      */
     private List<Geometry> getOrderedHoles(final Polygon poly) {
         List<Geometry> holes = new ArrayList<Geometry>();
-        List<IndexedEnvelope> bounds = new ArrayList<IndexedEnvelope>();
         if (poly.getNumInteriorRing() > 0) {
             for (int i = 0; i < poly.getNumInteriorRing(); i++) {
-                bounds.add(new IndexedEnvelope(i, poly.getInteriorRingN(i)
-                        .getEnvelopeInternal()));
+                holes.add(poly.getInteriorRingN(i));
             }
-            Collections.sort(bounds, new IndexedEnvelopeComparator());
-            for (int i = 0; i < bounds.size(); i++) {
-                holes.add(poly.getInteriorRingN(bounds.get(i).index));
-            }
+            Collections.sort(holes, new EnvelopeComparator());
         }
         return holes;
     }
 
     /**
-     * Return the index of the lowest vertex
+     * Get index of the leftmost vertex in geom
      * 
-     * @param geom
-     *            input geometry
-     * @return index of the first vertex found at lowest point of the geometry
+     * @param geom  hole
+     * @return      index of the left most vertex
      */
-    private int getLowestVertex(Geometry geom) {
+    private int getLeftMostVertex(Geometry geom) {
         Coordinate[] coords = geom.getCoordinates();
-        double minY = geom.getEnvelopeInternal().getMinY();
+        double minX = geom.getEnvelopeInternal().getMinX();
         for (int i = 0; i < coords.length; i++) {
-            if (Math.abs(coords[i].y - minY) < EPS) {
+            if (Math.abs(coords[i].x - minX) < EPS) {
                 return i;
             }
         }
-        throw new IllegalStateException("Failed to find lowest vertex");
+        throw new IllegalStateException("Failed to find left most vertex");
     }
 
-    private static class IndexedEnvelope {
-        int index;
-        Envelope envelope;
-
-        public IndexedEnvelope(int i, Envelope env) {
-            index = i;
-            envelope = env;
-        }
-    }
-
-    private static class IndexedEnvelopeComparator implements
-            Comparator<IndexedEnvelope> {
-        public int compare(IndexedEnvelope o1, IndexedEnvelope o2) {
-            double delta = o1.envelope.getMinY() - o2.envelope.getMinY();
-            if (Math.abs(delta) < EPS) {
-                delta = o1.envelope.getMinX() - o2.envelope.getMinX();
-                if (Math.abs(delta) < EPS) {
-                    return 0;
-                }
-            }
-            return (delta > 0 ? 1 : -1);
-        }
-    }
-
-    private static class IndexedDouble {
-        int index;
-        double value;
-
-        public IndexedDouble(int i, double v) {
-            index = i;
-            value = v;
-        }
-    }
-
-    private static class IndexedDoubleComparator implements
-            Comparator<IndexedDouble> {
-        public int compare(IndexedDouble o1, IndexedDouble o2) {
-            double delta = o1.value - o2.value;
-            if (Math.abs(delta) < EPS) {
-                return 0;
-            }
-            return (delta > 0 ? 1 : -1);
+    private static class EnvelopeComparator implements Comparator<Geometry> {
+        public int compare(Geometry o1, Geometry o2) {
+            Envelope e1 = o1.getEnvelopeInternal();
+            Envelope e2 = o2.getEnvelopeInternal();
+            if (e1.getMinX() < e2.getMinX())
+                return -1;
+            if (e1.getMinX() > e2.getMinX())
+                return 1;
+            if (e1.getMinY() < e2.getMinY())
+                return -1;
+            if (e1.getMinY() < e2.getMinY())
+                return 1;
+            return 0;
         }
     }
 }
