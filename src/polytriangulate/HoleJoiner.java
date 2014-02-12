@@ -48,11 +48,22 @@ public class HoleJoiner {
      */
     private void joinHoleToShell(Geometry hole) {
         final Coordinate[] holeCoords = hole.getCoordinates();
-        final int holeVertexIndex = getLeftMostVertex(hole);
-        final Coordinate holeCoord = holeCoords[holeVertexIndex];
+        ArrayList<Integer> holeVertexIndex = getLeftMostVertex(hole);
+        Coordinate holeCoord = holeCoords[holeVertexIndex.get(0)];
         Coordinate shellCoord = getLeftShellVertex(holeCoord);
+        int shortestIndex = 0;
+        if(Math.abs(shellCoord.x - holeCoord.x) < EPS){
+            double shortest = Double.MAX_VALUE;
+            for(int i = 0; i < holeVertexIndex.size(); i++){
+                double currLength = Math.abs(shellCoord.y - holeCoords[holeVertexIndex.get(i)].y);
+                if(currLength < shortest){
+                    shortest = currLength;
+                    shortestIndex = i;
+                }
+            }
+        }
         int shellVertexIndex = getIndexInShellCoords(shellCoord);
-        doJoinHole(shellVertexIndex, holeCoords, holeVertexIndex);
+        doJoinHole(shellVertexIndex, holeCoords, holeVertexIndex.get(shortestIndex));
     }
 
     /**
@@ -160,15 +171,16 @@ public class HoleJoiner {
      *            hole
      * @return index of the left most vertex
      */
-    private int getLeftMostVertex(Geometry geom) {
+    private ArrayList<Integer> getLeftMostVertex(Geometry geom) {
         Coordinate[] coords = geom.getCoordinates();
+        ArrayList<Integer> list = new ArrayList<Integer>();
         double minX = geom.getEnvelopeInternal().getMinX();
         for (int i = 0; i < coords.length; i++) {
             if (Math.abs(coords[i].x - minX) < EPS) {
-                return i;
+                list.add(i);
             }
         }
-        throw new IllegalStateException("Failed to find left most vertex");
+        return list;
     }
 
     private static class EnvelopeComparator implements Comparator<Geometry> {
