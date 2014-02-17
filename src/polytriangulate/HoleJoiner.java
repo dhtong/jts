@@ -52,18 +52,22 @@ public class HoleJoiner {
         Coordinate holeCoord = holeCoords[holeVertexIndex.get(0)];
         Coordinate shellCoord = getLeftShellVertex(holeCoord);
         int shortestIndex = 0;
-        if(Math.abs(shellCoord.x - holeCoord.x) < EPS){
+        if (Math.abs(shellCoord.x - holeCoord.x) < EPS) {
             double shortest = Double.MAX_VALUE;
-            for(int i = 0; i < holeVertexIndex.size(); i++){
-                double currLength = Math.abs(shellCoord.y - holeCoords[holeVertexIndex.get(i)].y);
-                if(currLength < shortest){
+            // find the vertex gives the shortest, if selected vertices are on
+            // the same vertical line
+            for (int i = 0; i < holeVertexIndex.size(); i++) {
+                double currLength = Math.abs(shellCoord.y
+                        - holeCoords[holeVertexIndex.get(i)].y);
+                if (currLength < shortest) {
                     shortest = currLength;
                     shortestIndex = i;
                 }
             }
         }
         int shellVertexIndex = getIndexInShellCoords(shellCoord);
-        doJoinHole(shellVertexIndex, holeCoords, holeVertexIndex.get(shortestIndex));
+        doJoinHole(shellVertexIndex, holeCoords,
+                holeVertexIndex.get(shortestIndex));
     }
 
     /**
@@ -164,8 +168,7 @@ public class HoleJoiner {
     }
 
     /**
-     * Get index of the leftmost vertex in hole, if same x, vertex with smaller
-     * y value will be returned
+     * Get a list of index of the leftmost vertex in hole
      * 
      * @param geom
      *            hole

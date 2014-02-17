@@ -52,6 +52,9 @@ public class EarClipperTest extends TestCase {
         unionEqualsOrigin(poly);
     }
     
+    /*
+     * Martin's square cases
+     */
     public void testCray() throws ParseException {
         String poly = "POLYGON ((100 400, 500 400, 500 100, 100 100, 100 400), (150 350, 200 350, 200 300, 150 300, 150 350), (150 250, 200 250, 200 200, 150 200, 150 250), (150 170, 200 170, 200 130, 150 130, 150 170), (225 325, 270 325, 270 290, 225 290, 225 325), (230 270, 270 270, 270 230, 230 230, 230 270), (230 200, 270 200, 270 160, 230 160, 230 200), (300 160, 340 160, 340 130, 300 130, 300 160), (300 230, 340 230, 340 180, 300 180, 300 230), (300 300, 340 300, 340 260, 300 260, 300 300), (300 370, 340 370, 340 330, 300 330, 300 370), (360 330, 410 330, 410 290, 360 290, 360 330), (360 260, 410 260, 410 220, 360 220, 360 260), (375 185, 420 185, 420 150, 375 150, 375 185), (430 300, 470 300, 470 240, 430 240, 430 300), (430 380, 469 380, 469 335, 430 335, 430 380), (440 210, 470 210, 470 170, 440 170, 440 210), (440 140, 470 140, 470 110, 440 110, 440 140), (220 380, 270 380, 270 350, 220 350, 220 380), (125 282, 211 282, 211 265, 125 265, 125 282), (225 137, 278 137, 278 115, 225 115, 225 137))";
         unionEqualsOrigin(poly);
@@ -110,9 +113,7 @@ public class EarClipperTest extends TestCase {
 
     protected void unionEqualsOrigin(String original) throws ParseException {
         Geometry geo = reader.read(original);
-        System.out.println(geo);
         Geometry result = runEarClip(geo);
- //System.out.println(result);
         unionEqualsOrigin(result, geo.union());
     }
 

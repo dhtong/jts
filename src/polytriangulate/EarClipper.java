@@ -247,9 +247,6 @@ public class EarClipper {
             holeJoiner.joinHoles(polyShellCoords);
         }
         polyShell = new PolygonShellSlow(polyShellCoords);
-        Coordinate[] coorArray = polyShellCoords.toArray(new Coordinate[0]);
-        Polygon tmp = gf.createPolygon(gf.createLinearRing(coorArray));
-        System.out.println("++" + tmp);
     }
 }
 
