@@ -69,7 +69,7 @@ public class EarClipperTest extends TestCase {
     public void testTriangleWithHoles() throws ParseException {
         triangleWithHolesHelper(1);
         triangleWithHolesHelper(2);
-        triangleWithHolesHelper(3);
+        triangleWithHolesHelper(4);
     }
 
     public void triangleWithHolesHelper(int numOfHoles) throws ParseException {
@@ -80,8 +80,8 @@ public class EarClipperTest extends TestCase {
         String[] holeStr = new String[4];
         holeStr[0] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0))";
         holeStr[1] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0), (1 2, 0 1, 1 1, 1 2))";
-        holeStr[2] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0), (-1 2, 0 2, 0 3, -1 2))";
-        holeStr[2] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (1 2, 0 1, 1 1, 1 2), (-1 0, 0 0, -1 1, -1 0), (-1 2, 0 2, 0 3, -1 2), (4 0, 4 1, 3 0, 4 0))";
+        holeStr[2] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (-1 0, 0 0, -1 1, -1 0), (1 1, 0 2, 0 1, 1 1))";
+        holeStr[3] = "POLYGON((-2 -1, 5 0, 0 6, -2 -1), (1 2, 0 1, 1 1, 1 2), (-1 0, 0 0, -1 1, -1 0), (-1 2, 0 2, 0 3, -1 2), (4 0, 4 1, 3 0, 4 0))";
         return holeStr[numOfHoles - 1];
     }
 
@@ -110,8 +110,9 @@ public class EarClipperTest extends TestCase {
 
     protected void unionEqualsOrigin(String original) throws ParseException {
         Geometry geo = reader.read(original);
+        System.out.println(geo);
         Geometry result = runEarClip(geo);
-        System.out.println(result);
+ //System.out.println(result);
         unionEqualsOrigin(result, geo.union());
     }
 

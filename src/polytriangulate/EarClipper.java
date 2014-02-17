@@ -63,7 +63,7 @@ public class EarClipper {
      */
     private Geometry triangulate() {
         triList = new ArrayList<PolygonTriangle>();
-        createShell();  
+        createShell();
         computeEars();
         // improve triangulation if required
         if (isImprove) {
@@ -92,11 +92,20 @@ public class EarClipper {
                     polyShell.getCoordinate(iEar[1]),
                     polyShell.getCoordinate(iEar[2])) != CGAlgorithms.CLOCKWISE) {
                 // delete the "corner" if three points are in the same line
+                if (inLine(polyShell.getCoordinate(iEar[0]),
+                        polyShell.getCoordinate(iEar[1]),
+                        polyShell.getCoordinate(iEar[2]))) {
+                    //TODO: check if iEar[1] occurs after?
+                    polyShell.remove(iEar[1]);
+                    if (polyShell.size() < 3) {
+                        return;
+                    }
+                }
                 polyShell.nextCorner(iEar[0] + 1, iEar);
             }
             cornerCount++;
             if (cornerCount > 2 * polyShell.size()) {
-                System.out.println("---"+createResult());
+                System.out.println("---" + polyShell.toGeometry());
                 throw new IllegalStateException(
                         "Unable to find a convex corner which is a valid ear");
             }
@@ -238,13 +247,9 @@ public class EarClipper {
             holeJoiner.joinHoles(polyShellCoords);
         }
         polyShell = new PolygonShellSlow(polyShellCoords);
-        
-        
-        
-        
         Coordinate[] coorArray = polyShellCoords.toArray(new Coordinate[0]);
         Polygon tmp = gf.createPolygon(gf.createLinearRing(coorArray));
-        System.out.println("++"+tmp);
+        System.out.println("++" + tmp);
     }
 }
 
