@@ -111,7 +111,7 @@ public class EarClipper {
             }
             // if (isValidEar(k0, k1, k2)) {
             // if (isValidEarFast(iEar[0], iEar[1], iEar[2])) {
-            if (isValidEarSlow(iEar[0], iEar[1], iEar[2])) {
+            if (isValidEarSlow(iEar[0], iEar[1], iEar[2])) {             
                 foundEar = true;
                 // System.out.println(earPoly);
                 PolygonTriangle ear = new PolygonTriangle(iEar[0], iEar[1],
@@ -247,6 +247,7 @@ public class EarClipper {
             holeJoiner.joinHoles(polyShellCoords);
         }
         polyShell = new PolygonShellSlow(polyShellCoords);
+        System.out.println("joined " + polyShell.toGeometry());
     }
 }
 

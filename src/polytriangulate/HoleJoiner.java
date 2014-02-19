@@ -3,6 +3,7 @@ package com.vividsolutions.jts.polytriangulate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 
 import com.vividsolutions.jts.geom.Coordinate;
@@ -20,16 +21,18 @@ public class HoleJoiner {
     private List<Coordinate> shellCoords;
     // orderedCoords a copy of shellCoords for sort purpose
     private List<Coordinate> orderedCoords;
+    // Key: starting end of the cut; Value: list of the other end of the cut
+    private HashMap<Coordinate, ArrayList<Coordinate>> cutMap;
 
     public HoleJoiner(PreparedGeometry inputPrepGeom) {
         this.inputPrepGeom = inputPrepGeom;
         gf = inputPrepGeom.getGeometry().getFactory();
         orderedCoords = new ArrayList<Coordinate>();
+        cutMap = new HashMap<Coordinate, ArrayList<Coordinate>>();
     }
 
     /**
-     * @param shellCoords
-     *            Shell Coordinates of the polygon.
+     * @param shellCoords Shell Coordinates of the polygon.
      */
     public void joinHoles(List<Coordinate> shellCoords) {
         this.shellCoords = shellCoords;
@@ -42,32 +45,68 @@ public class HoleJoiner {
     }
 
     /**
-     * Join the current hole to the polygon
+     * 1) Get a list of HoleVertex Index. 2) Get a list of ShellVertex. 3) Get
+     * the pair that outputs the shortest distance between. This pair is the two
+     * ending points of the cut 4) selected ShellVertex may occurs multiple
+     * times in shellCoords[], find the proper one and add the hole behind.
      * 
      * @param hole
      */
     private void joinHoleToShell(Geometry hole) {
         final Coordinate[] holeCoords = hole.getCoordinates();
-        ArrayList<Integer> holeVertexIndex = getLeftMostVertex(hole);
-        Coordinate holeCoord = holeCoords[holeVertexIndex.get(0)];
-        Coordinate shellCoord = getLeftShellVertex(holeCoord);
-        int shortestIndex = 0;
+        ArrayList<Integer> holeLeftVerticesIndex = getLeftMostVertex(hole);
+        Coordinate holeCoord = holeCoords[holeLeftVerticesIndex.get(0)];
+        ArrayList<Coordinate> shellCoordsList = getLeftShellVertex(holeCoord);
+        Coordinate shellCoord = shellCoordsList.get(0);
+        int shortestHoleVertexIndex = 0;
+        // pick the shellvertex holevertex pair that gives the shortest
+        // distance
         if (Math.abs(shellCoord.x - holeCoord.x) < EPS) {
             double shortest = Double.MAX_VALUE;
-            // find the vertex gives the shortest, if selected vertices are on
-            // the same vertical line
-            for (int i = 0; i < holeVertexIndex.size(); i++) {
-                double currLength = Math.abs(shellCoord.y
-                        - holeCoords[holeVertexIndex.get(i)].y);
-                if (currLength < shortest) {
-                    shortest = currLength;
-                    shortestIndex = i;
+            for (int i = 0; i < holeLeftVerticesIndex.size(); i++) {
+                for (int j = 0; j < shellCoordsList.size(); j++) {
+                    double currLength = Math.abs(shellCoordsList.get(j).y
+                            - holeCoords[holeLeftVerticesIndex.get(i)].y);
+                    if (currLength < shortest) {
+                        shortest = currLength;
+                        shortestHoleVertexIndex = i;
+                        shellCoord = shellCoordsList.get(j);
+                    }
                 }
             }
         }
-        int shellVertexIndex = getIndexInShellCoords(shellCoord);
+        int shellVertexIndex = getShellCoordIndex(shellCoord,
+                holeCoords[holeLeftVerticesIndex.get(shortestHoleVertexIndex)]);
         doJoinHole(shellVertexIndex, holeCoords,
-                holeVertexIndex.get(shortestIndex));
+                holeLeftVerticesIndex.get(shortestHoleVertexIndex));
+    }
+
+    /**
+     * Get the ith shellvertex in shellCoords[] that the current should add
+     * after
+     * @param shellVertex Coordinate of the shell vertex
+     * @param holeVertex Coordinate of the hole vertex
+     * @return the ith shellvertex
+     */
+    private int getShellCoordIndex(Coordinate shellVertex, Coordinate holeVertex) {
+        int ith = 1;
+        ArrayList<Coordinate> newValueList = new ArrayList<Coordinate>();
+        newValueList.add(holeVertex);
+        if (cutMap.containsKey(shellVertex)) {
+            for (Coordinate coord : cutMap.get(shellVertex)) {
+                if (coord.y < holeVertex.y) {
+                    ith++;
+                }
+            }
+            cutMap.get(shellVertex).add(holeVertex);
+        }
+        else {
+            cutMap.put(shellVertex, newValueList);
+        }
+        if (!cutMap.containsKey(holeVertex)) {
+            cutMap.put(holeVertex, new ArrayList<Coordinate>(newValueList));
+        }
+        return getIthShellCoordIndex(shellVertex, ith);
     }
 
     /**
@@ -76,10 +115,12 @@ public class HoleJoiner {
      * @param coord
      * @return
      */
-    private int getIndexInShellCoords(Coordinate coord) {
+    private int getIthShellCoordIndex(Coordinate coord, int ith) {
         for (int i = 0; i < shellCoords.size(); i++) {
             if (shellCoords.get(i).equals2D(coord, EPS)) {
-                return i;
+                --ith;
+                if (ith == 0)
+                    return i;
             }
         }
         throw new IllegalStateException("Request vertex is not in sheelcoords");
@@ -93,8 +134,10 @@ public class HoleJoiner {
      * @param holeCoord
      * @return
      */
-    private Coordinate getLeftShellVertex(Coordinate holeCoord) {
+    private ArrayList<Coordinate> getLeftShellVertex(Coordinate holeCoord) {
+        // Change orderedCoords list to priority queue for performance
         Collections.sort(orderedCoords);
+        ArrayList<Coordinate> list = new ArrayList<Coordinate>();
         double holeX = holeCoord.x;
         int prevBiggest = 0;
         // Advanced approach needed here.
@@ -108,7 +151,16 @@ public class HoleJoiner {
         if (prevBiggest < 0)
             throw new IllegalStateException(
                     "Failed to find vertex on shell to join");
-        return orderedCoords.get(prevBiggest);
+        // reverse. add vertices with the same x value as the last to the list
+        Coordinate addToList = orderedCoords.get(prevBiggest);
+        double chosenX = addToList.x;
+        while (chosenX == addToList.x && prevBiggest >= 0) {
+            list.add(addToList);
+            --prevBiggest;
+            if (prevBiggest >= 0)
+                addToList = orderedCoords.get(prevBiggest);
+        }
+        return list;
     }
 
     /**
@@ -150,10 +202,10 @@ public class HoleJoiner {
     }
 
     /**
-     * Ordered the holes by left most vertex's x value.
+     * Ordered the holes by left most vertex's x value. if same x, arrange in
+     * top-down order
      * 
-     * @param poly
-     *            polygon that contains all the holes.
+     * @param poly polygon that contains all the holes.
      * @return list of ordered hole geometry
      */
     private List<Geometry> getOrderedHoles(final Polygon poly) {
@@ -170,8 +222,7 @@ public class HoleJoiner {
     /**
      * Get a list of index of the leftmost vertex in hole
      * 
-     * @param geom
-     *            hole
+     * @param geom hole
      * @return index of the left most vertex
      */
     private ArrayList<Integer> getLeftMostVertex(Geometry geom) {
@@ -194,10 +245,11 @@ public class HoleJoiner {
                 return -1;
             if (e1.getMinX() > e2.getMinX())
                 return 1;
-            if (e1.getMinY() < e2.getMinY())
-                return -1;
+            // if same x, place in top-down order
             if (e1.getMinY() < e2.getMinY())
                 return 1;
+            if (e1.getMinY() > e2.getMinY())
+                return -1;
             return 0;
         }
     }
