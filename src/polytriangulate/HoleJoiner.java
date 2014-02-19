@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.TreeSet;
 
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
@@ -20,14 +21,14 @@ public class HoleJoiner {
     private PreparedGeometry inputPrepGeom;
     private List<Coordinate> shellCoords;
     // orderedCoords a copy of shellCoords for sort purpose
-    private List<Coordinate> orderedCoords;
+    private TreeSet<Coordinate> orderedCoords;
     // Key: starting end of the cut; Value: list of the other end of the cut
     private HashMap<Coordinate, ArrayList<Coordinate>> cutMap;
 
     public HoleJoiner(PreparedGeometry inputPrepGeom) {
         this.inputPrepGeom = inputPrepGeom;
         gf = inputPrepGeom.getGeometry().getFactory();
-        orderedCoords = new ArrayList<Coordinate>();
+        orderedCoords = new TreeSet<Coordinate>();
         cutMap = new HashMap<Coordinate, ArrayList<Coordinate>>();
     }
 
@@ -136,29 +137,28 @@ public class HoleJoiner {
      */
     private ArrayList<Coordinate> getLeftShellVertex(Coordinate holeCoord) {
         // Change orderedCoords list to priority queue for performance
-        Collections.sort(orderedCoords);
         ArrayList<Coordinate> list = new ArrayList<Coordinate>();
         double holeX = holeCoord.x;
         int prevBiggest = 0;
         // Advanced approach needed here.
-        while (orderedCoords.get(prevBiggest).x <= holeX) {
-            ++prevBiggest;
+        Coordinate closest = orderedCoords.higher(holeCoord);
+        while(closest.x == holeCoord.x){
+            closest = orderedCoords.higher(closest);
         }
         do {
-            --prevBiggest;
-        } while (!joinAble(holeCoord, orderedCoords.get(prevBiggest))
-                && prevBiggest >= 0);
-        if (prevBiggest < 0)
-            throw new IllegalStateException(
-                    "Failed to find vertex on shell to join");
-        // reverse. add vertices with the same x value as the last to the list
-        Coordinate addToList = orderedCoords.get(prevBiggest);
-        double chosenX = addToList.x;
-        while (chosenX == addToList.x && prevBiggest >= 0) {
-            list.add(addToList);
-            --prevBiggest;
-            if (prevBiggest >= 0)
-                addToList = orderedCoords.get(prevBiggest);
+            closest = orderedCoords.lower(closest);
+        } while (!joinAble(holeCoord, closest)
+                && !closest.equals(orderedCoords.first()));
+        list.add(closest);
+        if (closest.x != holeCoord.x)
+            return list;
+        double chosenX = closest.x;
+        list.clear();
+        while (chosenX == closest.x) {
+            list.add(closest);
+            closest = orderedCoords.lower(closest);
+            if (closest == null)
+                return list;
         }
         return list;
     }

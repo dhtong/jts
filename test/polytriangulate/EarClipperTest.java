@@ -1,7 +1,6 @@
 package com.vividsolutions.jts.polytriangulate;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.TreeSet;
 
 import junit.framework.TestCase;
 
