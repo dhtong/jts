@@ -95,7 +95,6 @@ public class EarClipper {
                 if (inLine(polyShell.getCoordinate(iEar[0]),
                         polyShell.getCoordinate(iEar[1]),
                         polyShell.getCoordinate(iEar[2]))) {
-                    //TODO: check if iEar[1] occurs after?
                     polyShell.remove(iEar[1]);
                     if (polyShell.size() < 3) {
                         return;

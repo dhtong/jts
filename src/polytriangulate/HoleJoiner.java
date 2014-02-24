@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
 
+import com.vividsolutions.jts.algorithm.CGAlgorithms;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
@@ -59,6 +60,7 @@ public class HoleJoiner {
         Coordinate holeCoord = holeCoords[holeLeftVerticesIndex.get(0)];
         ArrayList<Coordinate> shellCoordsList = getLeftShellVertex(holeCoord);
         Coordinate shellCoord = shellCoordsList.get(0);
+        
         int shortestHoleVertexIndex = 0;
         // pick the shellvertex holevertex pair that gives the shortest
         // distance
@@ -138,8 +140,6 @@ public class HoleJoiner {
     private ArrayList<Coordinate> getLeftShellVertex(Coordinate holeCoord) {
         // Change orderedCoords list to priority queue for performance
         ArrayList<Coordinate> list = new ArrayList<Coordinate>();
-        double holeX = holeCoord.x;
-        int prevBiggest = 0;
         // Advanced approach needed here.
         Coordinate closest = orderedCoords.higher(holeCoord);
         while(closest.x == holeCoord.x){
@@ -212,8 +212,8 @@ public class HoleJoiner {
         List<Geometry> holes = new ArrayList<Geometry>();
         if (poly.getNumInteriorRing() > 0) {
             for (int i = 0; i < poly.getNumInteriorRing(); i++) {
-                holes.add(poly.getInteriorRingN(i));
-            }
+                holes.add(poly.getInteriorRingN(i));                
+            }           
             Collections.sort(holes, new EnvelopeComparator());
         }
         return holes;
