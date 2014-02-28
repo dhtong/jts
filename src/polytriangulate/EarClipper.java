@@ -32,8 +32,7 @@ public class EarClipper {
     /**
      * Constructor
      * 
-     * @param inputPolygon
-     *            the input polygon
+     * @param inputPolygon the input polygon
      */
     public EarClipper(Polygon inputPolygon) {
         gf = new GeometryFactory();
@@ -104,15 +103,13 @@ public class EarClipper {
             }
             cornerCount++;
             if (cornerCount > 2 * polyShell.size()) {
-                System.out.println("---" + polyShell.toGeometry());
                 throw new IllegalStateException(
                         "Unable to find a convex corner which is a valid ear");
             }
             // if (isValidEar(k0, k1, k2)) {
             // if (isValidEarFast(iEar[0], iEar[1], iEar[2])) {
-            if (isValidEarSlow(iEar[0], iEar[1], iEar[2])) {             
+            if (isValidEarSlow(iEar[0], iEar[1], iEar[2])) {
                 foundEar = true;
-                // System.out.println(earPoly);
                 PolygonTriangle ear = new PolygonTriangle(iEar[0], iEar[1],
                         iEar[2]);
                 triList.add(ear);
@@ -122,7 +119,8 @@ public class EarClipper {
                 }
                 polyShell.nextCorner(iEar[0], iEar);
                 cornerCount = 0;
-            } else {
+            }
+            else {
                 polyShell.nextCorner(iEar[0] + 1, iEar);
             }
         } while (!finished);
@@ -141,6 +139,12 @@ public class EarClipper {
         double abY = b.y - a.y;
         double acX = c.x - a.x;
         double acY = c.y - a.y;
+        // coordinate a and c are the same
+        if(acX == 0 && acY == 0)
+            return true;
+        // a, b are the same
+        if (abX == 0 && abY ==0)
+            return true;
         if (abX == 0 && acX == 0)
             return true;
         if (abX * acX == 0)
@@ -212,8 +216,7 @@ public class EarClipper {
     /**
      * Creates a Polygon from a PolygonTriangle object
      * 
-     * @param t
-     *            the triangle
+     * @param t the triangle
      * @return a new Polygon object
      */
     private Polygon createPolygon(final PolygonTriangle t) {
@@ -246,7 +249,6 @@ public class EarClipper {
             holeJoiner.joinHoles(polyShellCoords);
         }
         polyShell = new PolygonShellSlow(polyShellCoords);
-        System.out.println("joined " + polyShell.toGeometry());
     }
 }
 
@@ -292,8 +294,7 @@ class PolygonShellSlow {
      * Get the index of the next available shell coordinate starting from the
      * given candidate position.
      * 
-     * @param pos
-     *            candidate position
+     * @param pos candidate position
      * 
      * @return index of the next available shell coordinate
      */
@@ -360,8 +361,7 @@ class PolygonShell {
      * Get the index of the next available shell coordinate starting from the
      * given candidate position.
      * 
-     * @param pos
-     *            candidate position
+     * @param pos candidate position
      * 
      * @return index of the next available shell coordinate
      */

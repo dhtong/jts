@@ -60,7 +60,6 @@ public class HoleJoiner {
         Coordinate holeCoord = holeCoords[holeLeftVerticesIndex.get(0)];
         ArrayList<Coordinate> shellCoordsList = getLeftShellVertex(holeCoord);
         Coordinate shellCoord = shellCoordsList.get(0);
-        
         int shortestHoleVertexIndex = 0;
         // pick the shellvertex holevertex pair that gives the shortest
         // distance
@@ -130,19 +129,17 @@ public class HoleJoiner {
     }
 
     /**
-     * Find the shell coordinate which is 1. closest to the left most vertex of
-     * the hole 2. on the left of the hole 3. lingstring is covered 4. in
-     * ShellCoords list
+     * Return a list of shell vertices that could be used to join with
+     * holeCoord. This list contains only one item if the chosen vertex does not
+     * share the same x value with holeCoord
      * 
      * @param holeCoord
      * @return
      */
     private ArrayList<Coordinate> getLeftShellVertex(Coordinate holeCoord) {
-        // Change orderedCoords list to priority queue for performance
         ArrayList<Coordinate> list = new ArrayList<Coordinate>();
-        // Advanced approach needed here.
         Coordinate closest = orderedCoords.higher(holeCoord);
-        while(closest.x == holeCoord.x){
+        while (closest.x == holeCoord.x) {
             closest = orderedCoords.higher(closest);
         }
         do {
@@ -212,8 +209,8 @@ public class HoleJoiner {
         List<Geometry> holes = new ArrayList<Geometry>();
         if (poly.getNumInteriorRing() > 0) {
             for (int i = 0; i < poly.getNumInteriorRing(); i++) {
-                holes.add(poly.getInteriorRingN(i));                
-            }           
+                holes.add(poly.getInteriorRingN(i));
+            }
             Collections.sort(holes, new EnvelopeComparator());
         }
         return holes;
