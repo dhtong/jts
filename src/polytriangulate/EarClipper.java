@@ -1,18 +1,21 @@
 package com.vividsolutions.jts.polytriangulate;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.List;
+
 import com.vividsolutions.jts.algorithm.CGAlgorithms;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.CoordinateList;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.Triangle;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class EarClipper {
     private final GeometryFactory gf;
@@ -106,7 +109,6 @@ public class EarClipper {
                 throw new IllegalStateException(
                         "Unable to find a convex corner which is a valid ear");
             }
-            // if (isValidEar(k0, k1, k2)) {
             // if (isValidEarFast(iEar[0], iEar[1], iEar[2])) {
             if (isValidEarSlow(iEar[0], iEar[1], iEar[2])) {
                 foundEar = true;
@@ -140,10 +142,10 @@ public class EarClipper {
         double acX = c.x - a.x;
         double acY = c.y - a.y;
         // coordinate a and c are the same
-        if(acX == 0 && acY == 0)
+        if (acX == 0 && acY == 0)
             return true;
         // a, b are the same
-        if (abX == 0 && abY ==0)
+        if (abX == 0 && abY == 0)
             return true;
         if (abX == 0 && acX == 0)
             return true;
@@ -184,10 +186,24 @@ public class EarClipper {
         return false;
     }
 
+    /**
+     * This method has problems with holes.
+     * @param k0
+     * @param k1
+     * @param k2
+     * @return
+     */
     private boolean isValidEarFast(int k0, int k1, int k2) {
         Coordinate[] triRing = new Coordinate[] { polyShell.getCoordinate(k0),
                 polyShell.getCoordinate(k1), polyShell.getCoordinate(k2),
                 polyShell.getCoordinate(k0) };
+        Coordinate centroid = Triangle.centroid(polyShell.getCoordinate(k0),
+                polyShell.getCoordinate(k1), polyShell.getCoordinate(k2));
+        Point centroPoint = gf.createPoint(centroid);
+        if(!centroPoint.within(inputPolygon)){
+            return false;
+        }
+        //TODO: This would not work. Some vertices could have been removed.
         int n = polyShellCoords.size();
         for (int i = 0; i < n; i++) {
             Coordinate v = polyShellCoords.get(i);
@@ -259,14 +275,17 @@ class PolygonShellSlow {
      * orientation.
      */
     private List<Coordinate> shellCoords;
-    private boolean[] shellCoordAvailable;
+    //private boolean[] shellCoordAvailable;
     private int size;
+    private BitSet shellCoordAvailable;
 
     public PolygonShellSlow(List<Coordinate> shellCoords) {
         this.shellCoords = shellCoords;
-        shellCoordAvailable = new boolean[shellCoords.size() - 1];
-        Arrays.fill(shellCoordAvailable, true);
-        size = shellCoordAvailable.length;
+        /*shellCoordAvailable = new boolean[shellCoords.size() - 1];
+        Arrays.fill(shellCoordAvailable, true);*/
+        size = shellCoords.size();
+        shellCoordAvailable = new BitSet(size);
+        shellCoordAvailable.set(0, size);        
     }
 
     public int size() {
@@ -274,7 +293,8 @@ class PolygonShellSlow {
     }
 
     public void remove(int i) {
-        shellCoordAvailable[i] = false;
+        //shellCoordAvailable[i] = false;
+        shellCoordAvailable.set(i, false);
         size--;
     }
 
@@ -283,7 +303,8 @@ class PolygonShellSlow {
     }
 
     public void nextCorner(int i, int[] iVert) {
-        if (!shellCoordAvailable[i % shellCoordAvailable.length])
+        i = i % shellCoordAvailable.size();
+        if (!shellCoordAvailable.get(i))
             i = nextIndex(i);
         iVert[0] = i;
         iVert[1] = nextIndex(iVert[0]);
@@ -299,18 +320,23 @@ class PolygonShellSlow {
      * @return index of the next available shell coordinate
      */
     private int nextIndex(int pos) {
-        int posNext = (pos + 1) % shellCoordAvailable.length;
+        /*int posNext = (pos + 1) % shellCoordAvailable.length;
         while (!shellCoordAvailable[posNext]) {
             posNext = (posNext + 1) % shellCoordAvailable.length;
         }
-        return posNext;
+        return posNext;*/
+        int next = (pos + 1) % shellCoordAvailable.size();
+        next = shellCoordAvailable.nextSetBit(next);
+        if(next == -1)
+            next = shellCoordAvailable.nextSetBit(0);        
+        return next;
     }
 
     public Polygon toGeometry() {
         GeometryFactory fact = new GeometryFactory();
         CoordinateList coordList = new CoordinateList();
         for (int i = 0; i < shellCoords.size(); i++) {
-            if (i < shellCoordAvailable.length && shellCoordAvailable[i])
+            if (i < shellCoordAvailable.size() && shellCoordAvailable.get(i))
                 coordList.add(getCoordinate(i), false);
         }
         coordList.closeRing();
