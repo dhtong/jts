@@ -203,7 +203,7 @@ public class EarClipper {
         if(!centroPoint.within(inputPolygon)){
             return false;
         }
-        //TODO: This would not work. Some vertices could have been removed.
+        //TODO: This would not work. Some vertices may have been removed at this point.
         int n = polyShellCoords.size();
         for (int i = 0; i < n; i++) {
             Coordinate v = polyShellCoords.get(i);
