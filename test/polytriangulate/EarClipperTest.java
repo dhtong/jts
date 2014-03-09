@@ -1,5 +1,7 @@
 package com.vividsolutions.jts.polytriangulate;
 
+import java.util.ArrayList;
+
 import junit.framework.TestCase;
 
 import com.vividsolutions.jts.geom.Coordinate;
@@ -95,7 +97,7 @@ public class EarClipperTest extends TestCase {
         triangleWithHolesHelper(2);
         triangleWithHolesHelper(4);
     }
-
+    
     public void triangleWithHolesHelper(int numOfHoles) throws ParseException {
         unionEqualsOrigin(getHoles(numOfHoles));
     }
@@ -216,7 +218,7 @@ public class EarClipperTest extends TestCase {
 
     protected Geometry runEarClip(Geometry g, boolean improve) {
         // extract first polygon
-        EarClipper clipper = new EarClipper((Polygon) g.getGeometryN(0));
+        EarClipperM clipper = new EarClipperM((Polygon) g.getGeometryN(0));
         clipper.setImprove(improve);
         Geometry ears = clipper.getResult();
         return ears;

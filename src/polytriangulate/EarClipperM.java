@@ -4,14 +4,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import com.vividsolutions.jts.algorithm.Angle;
 import com.vividsolutions.jts.algorithm.CGAlgorithms;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.CoordinateList;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
-import com.vividsolutions.jts.geom.Triangle;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
 
@@ -76,52 +76,61 @@ public class EarClipperM {
     private void computeEars() {
         boolean finished = false;
         boolean foundEar = false;
-        int[] iEar = new int[3];
         // int k0 = 0;
         // int k1 = 1;
         // int k2 = 2;
         int firstK = 0;
-        polyShell.nextCorner(0, iEar, false);
+        // polyShell.nextCorner(false);
         int cornerCount = 0;
         do {
             foundEar = false;
             // find next convex corner (which is the next candidate ear)
-            while (CGAlgorithms.computeOrientation(
-                    polyShell.getCoordinate(iEar[0]),
-                    polyShell.getCoordinate(iEar[1]),
-                    polyShell.getCoordinate(iEar[2])) != CGAlgorithms.CLOCKWISE) {
+            Coordinate[] cornerCandidate = polyShell
+                    .getCornerCandidateVertices();
+            while (CGAlgorithms.computeOrientation(cornerCandidate[0],
+                    cornerCandidate[1], cornerCandidate[2]) != CGAlgorithms.CLOCKWISE) {
                 // delete the "corner" if three points are in the same line
-                if (inLine(polyShell.getCoordinate(iEar[0]),
-                        polyShell.getCoordinate(iEar[1]),
-                        polyShell.getCoordinate(iEar[2]))) {
-                    polyShell.remove(iEar[0], iEar[1]);
+                if (inLine(cornerCandidate[0], cornerCandidate[1],
+                        cornerCandidate[2])) {
+                    polyShell.remove();
                     if (polyShell.size() < 3) {
                         return;
                     }
                 }
-                polyShell.nextCorner(iEar[0], iEar, true);
+                polyShell.nextCorner(true);
+                cornerCandidate = polyShell.getCornerCandidateVertices();
             }
             cornerCount++;
             if (cornerCount > 2 * polyShell.size()) {
                 throw new IllegalStateException(
                         "Unable to find a convex corner which is a valid ear");
             }
-            // if (isValidEarFast(iEar[0], iEar[1], iEar[2])) {
-            if (isValidEarSlow(iEar[0], iEar[1], iEar[2])) {
+            boolean b = polyShell.isValidEarFast();
+            // boolean a = isValidEarSlow();
+            /*
+             * if (a != b) { System.out.println(b + " " +
+             * polyShell.toGeometry()); System.out.println("---" +
+             * polyShell.getCornerCandidateVertices()[0] + " " +
+             * polyShell.getCornerCandidateVertices()[1] + " " +
+             * polyShell.getCornerCandidateVertices()[2]); }
+             */
+            if (b) {
                 foundEar = true;
-                PolygonTriangle ear = new PolygonTriangle(iEar[0], iEar[1],
-                        iEar[2]);
+                int[] earIndex = polyShell.getCornerCandidateIndex();
+                PolygonTriangle ear = new PolygonTriangle(earIndex[0],
+                        earIndex[1], earIndex[2]);
                 triList.add(ear);
-                polyShell.remove(iEar[0], iEar[1]);
+                polyShell.remove();
                 if (polyShell.size() < 3) {
                     return;
                 }
-                polyShell.nextCorner(iEar[0], iEar, false);
+                // polyShell.nextCorner(false);
                 cornerCount = 0;
             }
             else {
-                polyShell.nextCorner(iEar[0], iEar, true);
+                polyShell.nextCorner(true);
             }
+            cornerCandidate = polyShell.getCornerCandidateVertices();
         } while (!finished);
     }
 
@@ -165,57 +174,21 @@ public class EarClipperM {
      * @param k2
      * @return
      */
-    private boolean isValidEarSlow(int k0, int k1, int k2) {
+    private boolean isValidEarSlow() {
         // if (!isValidEdge(k0, k2))
         // return false;
+        Coordinate[] cornerCandidate = polyShell.getCornerCandidateVertices();
         LineString ls = gf.createLineString(new Coordinate[] {
-                polyShell.getCoordinate(k0), polyShell.getCoordinate(k2) });
+                cornerCandidate[0], cornerCandidate[1] });
         if (!inputPrepGeom.covers(ls))
             return false;
         Polygon earPoly = gf.createPolygon(
-                gf.createLinearRing(new Coordinate[] {
-                        polyShell.getCoordinate(k0),
-                        polyShell.getCoordinate(k1),
-                        polyShell.getCoordinate(k2),
-                        polyShell.getCoordinate(k0) }), null);
+                gf.createLinearRing(new Coordinate[] { cornerCandidate[0],
+                        cornerCandidate[1], cornerCandidate[2],
+                        cornerCandidate[0] }), null);
         if (inputPrepGeom.covers(earPoly))
             return true;
         return false;
-    }
-
-    /**
-     * This method has problems with holes.
-     * @param k0
-     * @param k1
-     * @param k2
-     * @return
-     */
-    private boolean isValidEarFast(int k0, int k1, int k2) {
-        Coordinate[] triRing = new Coordinate[] { polyShell.getCoordinate(k0),
-                polyShell.getCoordinate(k1), polyShell.getCoordinate(k2),
-                polyShell.getCoordinate(k0) };
-        Coordinate centroid = Triangle.centroid(polyShell.getCoordinate(k0),
-                polyShell.getCoordinate(k1), polyShell.getCoordinate(k2));
-        Point centroPoint = gf.createPoint(centroid);
-        if (!centroPoint.within(inputPolygon)) {
-            return false;
-        }
-        // TODO: This would not work. Some vertices could have been removed.
-        int n = polyShellCoords.size();
-        for (int i = 0; i < n; i++) {
-            Coordinate v = polyShellCoords.get(i);
-            // skip if vertex is a triangle vertex
-            if (v.equals2D(triRing[0]))
-                continue;
-            if (v.equals2D(triRing[1]))
-                continue;
-            if (v.equals2D(triRing[2]))
-                continue;
-            // not valid if vertex is contained in tri
-            if (CGAlgorithms.isPointInRing(v, triRing))
-                return false;
-        }
-        return true;
     }
 
     private Geometry createResult() {
@@ -274,43 +247,135 @@ class PolygonShellM {
     private List<Coordinate> shellCoords;
     private int[] shellCoordAvailable;
     private int size;
+    // index for current candidate corner
+    public int[] cornerCandidate;
+    // first available coordinate index
+    private int firstAvailable;
 
     public PolygonShellM(List<Coordinate> shellCoords) {
         this.shellCoords = shellCoords;
-        size = shellCoords.size();
-        shellCoordAvailable = new int[size - 1];
-        for (int i = 0; i < size - 1; i++) {
+        size = shellCoords.size() - 1;
+        shellCoordAvailable = new int[size];
+        for (int i = 0; i < size; i++) {
             shellCoordAvailable[i] = i + 1;
         }
-        shellCoordAvailable[size - 2] = 0;
+        shellCoordAvailable[size - 1] = 0;
+        cornerCandidate = new int[3];
+        cornerCandidate[0] = 0;
+        cornerCandidate[1] = 1;
+        cornerCandidate[2] = 2;
+        firstAvailable = 0;
     }
 
     public int size() {
         return size;
     }
 
-    public void remove(int first, int mid) {
-        shellCoordAvailable[first] = shellCoordAvailable[mid];
-        size--;
-    }
-
-    public Coordinate getCoordinate(int i) {
-        return shellCoords.get(i);
+    /**
+     * Check if the current corner candidate is valid without using cover()
+     * 
+     * @return
+     */
+    public boolean isValidEarFast() {
+        Coordinate[] cornerCandidateV = getCornerCandidateVertices();
+        double angle = Angle.angleBetweenOriented(cornerCandidateV[0],
+                cornerCandidateV[1], cornerCandidateV[2]);
+        Coordinate[] triRing = new Coordinate[] { cornerCandidateV[0],
+                cornerCandidateV[1], cornerCandidateV[2], cornerCandidateV[0] };
+        int currIndex = nextIndex(firstAvailable);
+        int prevIndex = firstAvailable;
+        Coordinate prevV = shellCoords.get(prevIndex);
+        for (int i = 0; i < size; i++) {
+            Coordinate v = shellCoords.get(currIndex);
+            // when corner[1] occurs, cannot simply skip. It might occur
+            // multiple times and is connected with a hole
+            if (v.equals2D(triRing[1])) {
+                Coordinate nextTmp = shellCoords.get(nextIndex(currIndex));
+                double aOut = Angle.angleBetweenOriented(cornerCandidateV[0],
+                        cornerCandidateV[1], nextTmp);
+                double aIn = Angle.angleBetweenOriented(cornerCandidateV[0],
+                        cornerCandidateV[1], prevV);
+                // TODO: add cases where a line attaching to corner[1]
+                // if(aOut == aIn){
+                // remove(prevIndex, currIndex);
+                // }
+                if (aOut > 0 && aOut < angle)
+                    return false;
+                if (aIn > 0 && aIn < angle)
+                    return false;
+                if (aOut == 0 && aIn == angle)
+                    return false;
+                prevV = v;
+                prevIndex = currIndex;
+                currIndex = nextIndex(currIndex);
+                continue;
+            }
+            prevV = v;
+            prevIndex = currIndex;
+            currIndex = nextIndex(currIndex);
+            if (v.equals2D(triRing[0]) || v.equals2D(triRing[2])) {
+                continue;
+            }
+            // not valid if vertex is contained in tri
+            if (CGAlgorithms.isPointInRing(v, triRing)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
-     * Move to the next corner
-     * @param i         first coordinate in the current corner
-     * @param iVert     coordinate array for the current corner
-     * @param moveFirst if next corner has differnt first coordinate
+     * Remove corner[1] and update the candidate corner.
      */
-    public void nextCorner(int i, int[] iVert, boolean moveFirst) {
-        if (moveFirst){
-            i = shellCoordAvailable[i];
+    public void remove() {
+        if (firstAvailable == cornerCandidate[1]) {
+            firstAvailable = shellCoordAvailable[cornerCandidate[1]];
         }
-        iVert[0] = i;
-        iVert[1] = nextIndex(iVert[0]);
-        iVert[2] = nextIndex(iVert[1]);
+        shellCoordAvailable[cornerCandidate[0]] = shellCoordAvailable[cornerCandidate[1]];
+        shellCoordAvailable[cornerCandidate[1]] = -1;
+        size--;
+        nextCorner(false);
+    }
+
+    /**
+     * Remove curr
+     * @param pre
+     * @param curr
+     */
+    private void remove(int pre, int curr) {
+        if (firstAvailable == curr) {
+            firstAvailable = shellCoordAvailable[curr];
+        }
+        shellCoordAvailable[pre] = shellCoordAvailable[curr];
+        shellCoordAvailable[curr] = -1;
+        size--;
+    }
+
+    public Coordinate[] getCornerCandidateVertices() {
+        Coordinate[] coord = new Coordinate[] {
+                shellCoords.get(cornerCandidate[0]),
+                shellCoords.get(cornerCandidate[1]),
+                shellCoords.get(cornerCandidate[2]) };
+        return coord;
+    }
+
+    public int[] getCornerCandidateIndex() {
+        return cornerCandidate;
+    }
+
+    /**
+     * Set to next corner candidate.
+     * @param moveFirst if corner[0] should be moved to next available
+     *            coordinates.
+     */
+    public void nextCorner(boolean moveFirst) {
+        if (size < 3)
+            return;
+        if (moveFirst) {
+            cornerCandidate[0] = nextIndex(cornerCandidate[0]);
+        }
+        cornerCandidate[1] = nextIndex(cornerCandidate[0]);
+        cornerCandidate[2] = nextIndex(cornerCandidate[1]);
     }
 
     /**
@@ -322,20 +387,21 @@ class PolygonShellM {
      * @return index of the next available shell coordinate
      */
     private int nextIndex(int pos) {
-        /*
-         * int posNext = (pos + 1) % shellCoordAvailable.length; while
-         * (!shellCoordAvailable[posNext]) { posNext = (posNext + 1) %
-         * shellCoordAvailable.length; } return posNext;
-         */
         return shellCoordAvailable[pos];
     }
-    /*
-     * public Polygon toGeometry() { GeometryFactory fact = new
-     * GeometryFactory(); CoordinateList coordList = new CoordinateList(); for
-     * (int i = 0; i < shellCoords.size(); i++) { if (i <
-     * shellCoordAvailable.length && shellCoordAvailable.get(i))
-     * coordList.add(getCoordinate(i), false); } coordList.closeRing(); return
-     * fact.createPolygon( fact.createLinearRing(coordList.toCoordinateArray()),
-     * null); }
-     */
+
+    public Polygon toGeometry() {
+        GeometryFactory fact = new GeometryFactory();
+        CoordinateList coordList = new CoordinateList();
+        int availIndex = firstAvailable;
+        for (int i = 0; i < size; i++) {
+            Coordinate v = shellCoords.get(availIndex);
+            availIndex = nextIndex(availIndex);
+            // if (i < shellCoordAvailable.length && shellCoordAvailable.get(i))
+            coordList.add(v, true);
+        }
+        coordList.closeRing();
+        return fact.createPolygon(
+                fact.createLinearRing(coordList.toCoordinateArray()), null);
+    }
 }
