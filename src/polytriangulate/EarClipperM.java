@@ -76,11 +76,6 @@ public class EarClipperM {
     private void computeEars() {
         boolean finished = false;
         boolean foundEar = false;
-        // int k0 = 0;
-        // int k1 = 1;
-        // int k2 = 2;
-        int firstK = 0;
-        // polyShell.nextCorner(false);
         int cornerCount = 0;
         do {
             foundEar = false;
@@ -107,13 +102,6 @@ public class EarClipperM {
             }
             boolean b = polyShell.isValidEarFast();
             // boolean a = isValidEarSlow();
-            /*
-             * if (a != b) { System.out.println(b + " " +
-             * polyShell.toGeometry()); System.out.println("---" +
-             * polyShell.getCornerCandidateVertices()[0] + " " +
-             * polyShell.getCornerCandidateVertices()[1] + " " +
-             * polyShell.getCornerCandidateVertices()[2]); }
-             */
             if (b) {
                 foundEar = true;
                 int[] earIndex = polyShell.getCornerCandidateIndex();
@@ -124,7 +112,6 @@ public class EarClipperM {
                 if (polyShell.size() < 3) {
                     return;
                 }
-                // polyShell.nextCorner(false);
                 cornerCount = 0;
             }
             else {
@@ -351,6 +338,10 @@ class PolygonShellM {
         size--;
     }
 
+    /**
+     * Get the corner candidate coordinates based on current candidate index
+     * @return
+     */
     public Coordinate[] getCornerCandidateVertices() {
         Coordinate[] coord = new Coordinate[] {
                 shellCoords.get(cornerCandidate[0]),

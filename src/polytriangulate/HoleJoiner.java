@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
 
-import com.vividsolutions.jts.algorithm.CGAlgorithms;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
