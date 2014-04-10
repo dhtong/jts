@@ -2,6 +2,7 @@ package com.vividsolutions.jts.polytriangulate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import com.vividsolutions.jts.algorithm.Angle;
@@ -14,12 +15,14 @@ import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
+import com.vividsolutions.jts.polytriangulate.tri.TriN;
 
 public class EarClipperM {
     private final GeometryFactory gf;
     private final Polygon inputPolygon;
     private PreparedGeometry inputPrepGeom;
     private Geometry triangulation;
+    // private List<PolygonTriangle> triListComp;
     /**
      * The shell coordinates are maintain in CW order. This means that for
      * convex interior angles, the vertices forming the angle are in CW
@@ -27,17 +30,25 @@ public class EarClipperM {
      */
     private PolygonShellM polyShell;
     private List<Coordinate> polyShellCoords;
-    private List<PolygonTriangle> triList;
+    private List<TriN> triList;
     private boolean isImprove = true;
+    // Used to find neighbors when a new tri is created
+    // Note: cannot use Edge for HashMap because of hashcode()
+    private HashMap<Coordinate, TriN> triMap;
 
+    // This set is used because it is possible that Tri's are divided to several
+    // unconnected groups
+    // private HashSet<TriN> uncheckedTri;
     /**
      * Constructor
-     * 
-     * @param inputPolygon the input polygon
+     * @param inputPolygon
+     *            the input polygon
      */
     public EarClipperM(Polygon inputPolygon) {
         gf = new GeometryFactory();
         this.inputPolygon = inputPolygon;
+        triMap = new HashMap<Coordinate, TriN>();
+        // uncheckedTri = new HashSet<TriN>();
     }
 
     public void setImprove(boolean isImproved) {
@@ -46,7 +57,6 @@ public class EarClipperM {
 
     /**
      * Get the result triangular polygons.
-     * 
      * @return triangles as a GeometryCollection
      */
     public Geometry getResult() {
@@ -58,17 +68,27 @@ public class EarClipperM {
 
     /**
      * Performs the ear-clipping triangulation
-     * 
      * @return GeometryCollection of triangular polygons
      */
     private Geometry triangulate() {
-        triList = new ArrayList<PolygonTriangle>();
+        // triListComp = new ArrayList<PolygonTriangle>();
+        triList = new ArrayList<TriN>();
         createShell();
         computeEars();
         // improve triangulation if required
         if (isImprove) {
-            TriangleImprover improver = new TriangleImprover(polyShellCoords);
+            long start = System.currentTimeMillis();
+            /*
+             * TriangleImprover improver = new
+             * TriangleImprover(polyShellCoords);
+             * improver.improve(triListComp);
+             */
+            TriTriangleImprover improver = new TriTriangleImprover(
+                    polyShellCoords);
             improver.improve(triList);
+            long end = System.currentTimeMillis();
+            System.out.println("improve used: " + (end - start)
+                    + " milliseconds");
         }
         return createResult();
     }
@@ -77,11 +97,15 @@ public class EarClipperM {
         boolean finished = false;
         boolean foundEar = false;
         int cornerCount = 0;
+        // int k0 = 0;
+        // int k1 = 1;
+        // int k2 = 2;
+        int firstK = 0;
+        polyShell.nextCorner(false);
+        // find next convex corner (which is the next candidate ear)
+        Coordinate[] cornerCandidate = polyShell.getCornerCandidateVertices();
         do {
             foundEar = false;
-            // find next convex corner (which is the next candidate ear)
-            Coordinate[] cornerCandidate = polyShell
-                    .getCornerCandidateVertices();
             while (CGAlgorithms.computeOrientation(cornerCandidate[0],
                     cornerCandidate[1], cornerCandidate[2]) != CGAlgorithms.CLOCKWISE) {
                 // delete the "corner" if three points are in the same line
@@ -104,17 +128,36 @@ public class EarClipperM {
             // boolean a = isValidEarSlow();
             if (b) {
                 foundEar = true;
-                int[] earIndex = polyShell.getCornerCandidateIndex();
-                PolygonTriangle ear = new PolygonTriangle(earIndex[0],
-                        earIndex[1], earIndex[2]);
-                triList.add(ear);
+                triList.add(constructTri(cornerCandidate));
+                /*
+                 * int[] iEar = polyShell.getCornerCandidateIndex();
+                 * PolygonTriangle ear = new PolygonTriangle(iEar[0], iEar[1],
+                 * iEar[2]);
+                 * triListComp.add(ear);
+                 */
                 polyShell.remove();
                 if (polyShell.size() < 3) {
+                    /*
+                     * HashSet<TriN> exi = new HashSet<TriN>();
+                     * ArrayDeque<TriN> q = new ArrayDeque<TriN>();
+                     * q.add(triList.get(0));
+                     * while (!q.isEmpty()) {
+                     * TriN curr = q.pop();
+                     * exi.add(curr);
+                     * for (int i = 0; i < 3; i++) {
+                     * if (curr.neighbor(i) != null) {
+                     * if (!exi.contains(curr.neighbor(i))) {
+                     * q.add(curr.neighbor(i));
+                     * }
+                     * }
+                     * }
+                     * }
+                     * System.out.println(exi.size() + " " + triList.size());
+                     */
                     return;
                 }
                 cornerCount = 0;
-            }
-            else {
+            } else {
                 polyShell.nextCorner(true);
             }
             cornerCandidate = polyShell.getCornerCandidateVertices();
@@ -122,8 +165,35 @@ public class EarClipperM {
     }
 
     /**
+     * Build Tri structure for the current clipped ear
+     * @param coords
+     *            ear coordinates
+     */
+    private TriN constructTri(Coordinate[] coords) {
+        TriN tri = new TriN(coords[0], coords[1], coords[2]);
+        // uncheckedTri.add(tri);
+        Coordinate a = new Coordinate(coords[0].x + coords[1].x, coords[0].y
+                + coords[1].y);
+        Coordinate b = new Coordinate(coords[1].x + coords[2].x, coords[1].y
+                + coords[2].y);
+        Coordinate c = new Coordinate(coords[0].x + coords[2].x, coords[0].y
+                + coords[2].y);
+        Coordinate[] midCoords = { a, b, c };
+        // get neighbors
+        TriN[] neighbors = { triMap.get(a), triMap.get(b), triMap.get(c) };
+        tri.setNeighbours(neighbors[0], neighbors[1], neighbors[2]);
+        for (int i = 0; i < 3; i++) {
+            if (neighbors[i] != null) {
+                neighbors[i].addNeighbour(tri);
+            } else {
+                triMap.put(midCoords[i], tri);
+            }
+        }
+        return tri;
+    }
+
+    /**
      * Check if the inputs are in the same line
-     * 
      * @param a
      * @param b
      * @param c
@@ -135,27 +205,30 @@ public class EarClipperM {
         double acX = c.x - a.x;
         double acY = c.y - a.y;
         // coordinate a and c are the same
-        if (acX == 0 && acY == 0)
+        if (acX == 0 && acY == 0) {
             return true;
+        }
         // a, b are the same
-        if (abX == 0 && abY == 0)
+        if (abX == 0 && abY == 0) {
             return true;
-        if (abX == 0 && acX == 0)
+        }
+        if (abX == 0 && acX == 0) {
             return true;
-        if (abX * acX == 0)
+        }
+        if (abX * acX == 0) {
             return false;
-        if (abY / abX == acY / acX)
+        }
+        if (abY / abX == acY / acX) {
             return true;
+        }
         return false;
     }
 
     /**
      * This is MB's original logic.
-     * 
      * It is quite expensive to compute. Could be possibly replaced with
      * checking whether any other vertices lie inside the ear - which could be
      * optimized with a spatial index on the vertices.
-     * 
      * @param k0
      * @param k1
      * @param k2
@@ -167,14 +240,16 @@ public class EarClipperM {
         Coordinate[] cornerCandidate = polyShell.getCornerCandidateVertices();
         LineString ls = gf.createLineString(new Coordinate[] {
                 cornerCandidate[0], cornerCandidate[1] });
-        if (!inputPrepGeom.covers(ls))
+        if (!inputPrepGeom.covers(ls)) {
             return false;
+        }
         Polygon earPoly = gf.createPolygon(
                 gf.createLinearRing(new Coordinate[] { cornerCandidate[0],
                         cornerCandidate[1], cornerCandidate[2],
                         cornerCandidate[0] }), null);
-        if (inputPrepGeom.covers(earPoly))
+        if (inputPrepGeom.covers(earPoly)) {
             return true;
+        }
         return false;
     }
 
@@ -188,18 +263,15 @@ public class EarClipperM {
 
     /**
      * Creates a Polygon from a PolygonTriangle object
-     * 
-     * @param t the triangle
+     * @param t
+     *            the triangle
      * @return a new Polygon object
      */
-    private Polygon createPolygon(final PolygonTriangle t) {
-        final int[] vertices = t.getVertices();
+    private Polygon createPolygon(final TriN t) {
         return gf.createPolygon(
-                gf.createLinearRing(new Coordinate[] {
-                        polyShellCoords.get(vertices[0]),
-                        polyShellCoords.get(vertices[1]),
-                        polyShellCoords.get(vertices[2]),
-                        polyShellCoords.get(vertices[0]) }), null);
+                gf.createLinearRing(new Coordinate[] { t.getCoordinate(0),
+                        t.getCoordinate(1), t.getCoordinate(2),
+                        t.getCoordinate(0) }), null);
     }
 
     /**
@@ -231,8 +303,8 @@ class PolygonShellM {
      * convex interior angles, the vertices forming the angle are in CW
      * orientation.
      */
-    private List<Coordinate> shellCoords;
-    private int[] shellCoordAvailable;
+    private final List<Coordinate> shellCoords;
+    private final int[] shellCoordAvailable;
     private int size;
     // index for current candidate corner
     public int[] cornerCandidate;
@@ -260,7 +332,6 @@ class PolygonShellM {
 
     /**
      * Check if the current corner candidate is valid without using cover()
-     * 
      * @return
      */
     public boolean isValidEarFast() {
@@ -286,12 +357,15 @@ class PolygonShellM {
                 // if(aOut == aIn){
                 // remove(prevIndex, currIndex);
                 // }
-                if (aOut > 0 && aOut < angle)
+                if (aOut > 0 && aOut < angle) {
                     return false;
-                if (aIn > 0 && aIn < angle)
+                }
+                if (aIn > 0 && aIn < angle) {
                     return false;
-                if (aOut == 0 && aIn == angle)
+                }
+                if (aOut == 0 && aIn == angle) {
                     return false;
+                }
                 prevV = v;
                 prevIndex = currIndex;
                 currIndex = nextIndex(currIndex);
@@ -356,12 +430,13 @@ class PolygonShellM {
 
     /**
      * Set to next corner candidate.
-     * @param moveFirst if corner[0] should be moved to next available
-     *            coordinates.
+     * @param moveFirst
+     *            if corner[0] should be moved to next available coordinates.
      */
     public void nextCorner(boolean moveFirst) {
-        if (size < 3)
+        if (size < 3) {
             return;
+        }
         if (moveFirst) {
             cornerCandidate[0] = nextIndex(cornerCandidate[0]);
         }
@@ -372,9 +447,8 @@ class PolygonShellM {
     /**
      * Get the index of the next available shell coordinate starting from the
      * given candidate position.
-     * 
-     * @param pos candidate position
-     * 
+     * @param pos
+     *            candidate position
      * @return index of the next available shell coordinate
      */
     private int nextIndex(int pos) {
