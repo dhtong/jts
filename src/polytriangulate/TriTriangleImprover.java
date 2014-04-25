@@ -1,7 +1,5 @@
 package com.vividsolutions.jts.polytriangulate;
 
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 
 import com.vividsolutions.jts.algorithm.CGAlgorithms;
@@ -11,20 +9,14 @@ import com.vividsolutions.jts.triangulate.quadedge.TrianglePredicate;
 
 public class TriTriangleImprover {
     private static int MAX_IMPROVE_SCAN = 20;
-    private final List<Coordinate> shellCoords;
-    private HashSet<TriN> uncheckedTri;
 
-    TriTriangleImprover(List<Coordinate> shellCoords) {
-        this.shellCoords = Collections.unmodifiableList(shellCoords);
-        uncheckedTri = new HashSet<TriN>();
+    public TriTriangleImprover() {
     }
 
     public void improve(List<TriN> triList) {
-        // uncheckedTri.addAll(triList);
         for (int i = 0; i < MAX_IMPROVE_SCAN; i++) {
             int improveCount = doImprovementScan(triList);
-            // System.out.println("improve #" + i + " - count = " +
-            // improveCount);
+            System.out.println("improve #" + i + " - count = " + improveCount);
             if (improveCount == 0) {
                 return;
             }
@@ -52,14 +44,14 @@ public class TriTriangleImprover {
         return improveCount;
     }
 
-    public boolean improve(TriN t0, TriN t1) {
+    private boolean improve(TriN t0, TriN t1) {
         if (t0 == null || t1 == null) {
             return false;
         }
         return flip(t0, t1);
     }
 
-    public boolean flip(TriN tri0, TriN tri1) {
+    private boolean flip(TriN tri0, TriN tri1) {
         Coordinate[] adjacentVertices = tri0.getSharedCoordinates(tri1);
         Coordinate adj0 = adjacentVertices[0];
         Coordinate adj1 = adjacentVertices[1];

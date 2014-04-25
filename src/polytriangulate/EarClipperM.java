@@ -11,18 +11,18 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.CoordinateList;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
-import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
+import com.vividsolutions.jts.polytriangulate.tri.TriEdge;
 import com.vividsolutions.jts.polytriangulate.tri.TriN;
+import com.vividsolutions.jts.polytriangulate.tri.Triangulation;
 
 public class EarClipperM {
     private final GeometryFactory gf;
     private final Polygon inputPolygon;
     private PreparedGeometry inputPrepGeom;
     private Geometry triangulation;
-    // private List<PolygonTriangle> triListComp;
     /**
      * The shell coordinates are maintain in CW order. This means that for
      * convex interior angles, the vertices forming the angle are in CW
@@ -34,7 +34,8 @@ public class EarClipperM {
     private boolean isImprove = true;
     // Used to find neighbors when a new tri is created
     // Note: cannot use Edge for HashMap because of hashcode()
-    private HashMap<Coordinate, TriN> triMap;
+    private HashMap<TriEdge, TriN> triMap;
+    private Triangulation triBuilder;
 
     // This set is used because it is possible that Tri's are divided to several
     // unconnected groups
@@ -47,10 +48,14 @@ public class EarClipperM {
     public EarClipperM(Polygon inputPolygon) {
         gf = new GeometryFactory();
         this.inputPolygon = inputPolygon;
-        triMap = new HashMap<Coordinate, TriN>();
-        // uncheckedTri = new HashSet<TriN>();
+        triMap = new HashMap<TriEdge, TriN>();
+        triBuilder = new Triangulation();
     }
 
+    /**
+     * if needs to improve the triangle set.
+     * @param isImproved
+     */
     public void setImprove(boolean isImproved) {
         this.isImprove = isImproved;
     }
@@ -71,20 +76,16 @@ public class EarClipperM {
      * @return GeometryCollection of triangular polygons
      */
     private Geometry triangulate() {
-        // triListComp = new ArrayList<PolygonTriangle>();
         triList = new ArrayList<TriN>();
         createShell();
         computeEars();
         // improve triangulation if required
         if (isImprove) {
             long start = System.currentTimeMillis();
-            /*
-             * TriangleImprover improver = new
-             * TriangleImprover(polyShellCoords);
-             * improver.improve(triListComp);
-             */
-            TriTriangleImprover improver = new TriTriangleImprover(
-                    polyShellCoords);
+            // TriangleImprover improver = new
+            // TriangleImprover(polyShellCoords);
+            // improver.improve(triListComp);
+            TriTriangleImprover improver = new TriTriangleImprover();
             improver.improve(triList);
             long end = System.currentTimeMillis();
             System.out.println("improve used: " + (end - start)
@@ -97,9 +98,6 @@ public class EarClipperM {
         boolean finished = false;
         boolean foundEar = false;
         int cornerCount = 0;
-        // int k0 = 0;
-        // int k1 = 1;
-        // int k2 = 2;
         int firstK = 0;
         polyShell.nextCorner(false);
         // find next convex corner (which is the next candidate ear)
@@ -124,36 +122,11 @@ public class EarClipperM {
                 throw new IllegalStateException(
                         "Unable to find a convex corner which is a valid ear");
             }
-            boolean b = polyShell.isValidEarFast();
-            // boolean a = isValidEarSlow();
-            if (b) {
+            if (polyShell.isValidEarFast()) {
                 foundEar = true;
-                triList.add(constructTri(cornerCandidate));
-                /*
-                 * int[] iEar = polyShell.getCornerCandidateIndex();
-                 * PolygonTriangle ear = new PolygonTriangle(iEar[0], iEar[1],
-                 * iEar[2]);
-                 * triListComp.add(ear);
-                 */
+                triList.add(triBuilder.add(cornerCandidate));
                 polyShell.remove();
                 if (polyShell.size() < 3) {
-                    /*
-                     * HashSet<TriN> exi = new HashSet<TriN>();
-                     * ArrayDeque<TriN> q = new ArrayDeque<TriN>();
-                     * q.add(triList.get(0));
-                     * while (!q.isEmpty()) {
-                     * TriN curr = q.pop();
-                     * exi.add(curr);
-                     * for (int i = 0; i < 3; i++) {
-                     * if (curr.neighbor(i) != null) {
-                     * if (!exi.contains(curr.neighbor(i))) {
-                     * q.add(curr.neighbor(i));
-                     * }
-                     * }
-                     * }
-                     * }
-                     * System.out.println(exi.size() + " " + triList.size());
-                     */
                     return;
                 }
                 cornerCount = 0;
@@ -162,34 +135,6 @@ public class EarClipperM {
             }
             cornerCandidate = polyShell.getCornerCandidateVertices();
         } while (!finished);
-    }
-
-    /**
-     * Build Tri structure for the current clipped ear
-     * @param coords
-     *            ear coordinates
-     */
-    private TriN constructTri(Coordinate[] coords) {
-        TriN tri = new TriN(coords[0], coords[1], coords[2]);
-        // uncheckedTri.add(tri);
-        Coordinate a = new Coordinate(coords[0].x + coords[1].x, coords[0].y
-                + coords[1].y);
-        Coordinate b = new Coordinate(coords[1].x + coords[2].x, coords[1].y
-                + coords[2].y);
-        Coordinate c = new Coordinate(coords[0].x + coords[2].x, coords[0].y
-                + coords[2].y);
-        Coordinate[] midCoords = { a, b, c };
-        // get neighbors
-        TriN[] neighbors = { triMap.get(a), triMap.get(b), triMap.get(c) };
-        tri.setNeighbours(neighbors[0], neighbors[1], neighbors[2]);
-        for (int i = 0; i < 3; i++) {
-            if (neighbors[i] != null) {
-                neighbors[i].addNeighbour(tri);
-            } else {
-                triMap.put(midCoords[i], tri);
-            }
-        }
-        return tri;
     }
 
     /**
@@ -219,35 +164,6 @@ public class EarClipperM {
             return false;
         }
         if (abY / abX == acY / acX) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * This is MB's original logic.
-     * It is quite expensive to compute. Could be possibly replaced with
-     * checking whether any other vertices lie inside the ear - which could be
-     * optimized with a spatial index on the vertices.
-     * @param k0
-     * @param k1
-     * @param k2
-     * @return
-     */
-    private boolean isValidEarSlow() {
-        // if (!isValidEdge(k0, k2))
-        // return false;
-        Coordinate[] cornerCandidate = polyShell.getCornerCandidateVertices();
-        LineString ls = gf.createLineString(new Coordinate[] {
-                cornerCandidate[0], cornerCandidate[1] });
-        if (!inputPrepGeom.covers(ls)) {
-            return false;
-        }
-        Polygon earPoly = gf.createPolygon(
-                gf.createLinearRing(new Coordinate[] { cornerCandidate[0],
-                        cornerCandidate[1], cornerCandidate[2],
-                        cornerCandidate[0] }), null);
-        if (inputPrepGeom.covers(earPoly)) {
             return true;
         }
         return false;
