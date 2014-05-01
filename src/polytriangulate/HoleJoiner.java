@@ -50,7 +50,6 @@ public class HoleJoiner {
      * the pair that outputs the shortest distance between. This pair is the two
      * ending points of the cut 4) selected ShellVertex may occurs multiple
      * times in shellCoords[], find the proper one and add the hole behind.
-     * 
      * @param hole
      */
     private void joinHoleToShell(Geometry hole) {
@@ -100,8 +99,7 @@ public class HoleJoiner {
                 }
             }
             cutMap.get(shellVertex).add(holeVertex);
-        }
-        else {
+        } else {
             cutMap.put(shellVertex, newValueList);
         }
         if (!cutMap.containsKey(holeVertex)) {
@@ -112,7 +110,6 @@ public class HoleJoiner {
 
     /**
      * Find the index of the coordinate in ShellCoords ArrayList
-     * 
      * @param coord
      * @return
      */
@@ -131,7 +128,6 @@ public class HoleJoiner {
      * Return a list of shell vertices that could be used to join with
      * holeCoord. This list contains only one item if the chosen vertex does not
      * share the same x value with holeCoord
-     * 
      * @param holeCoord
      * @return
      */
@@ -161,7 +157,6 @@ public class HoleJoiner {
 
     /**
      * Determine if a linestring between two coordinates is covered
-     * 
      * @param holeCoord
      * @param shellCoord
      * @return
@@ -177,7 +172,6 @@ public class HoleJoiner {
 
     /**
      * Add holeCoords to proper position. update ShellCoords and OrderedCoords
-     * 
      * @param shellVertexIndex
      * @param holeCoords
      * @param holeVertexIndex
@@ -200,7 +194,6 @@ public class HoleJoiner {
     /**
      * Ordered the holes by left most vertex's x value. if same x, arrange in
      * top-down order
-     * 
      * @param poly polygon that contains all the holes.
      * @return list of ordered hole geometry
      */
@@ -217,7 +210,6 @@ public class HoleJoiner {
 
     /**
      * Get a list of index of the leftmost vertex in hole
-     * 
      * @param geom hole
      * @return index of the left most vertex
      */

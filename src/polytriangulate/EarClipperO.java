@@ -17,7 +17,7 @@ import com.vividsolutions.jts.geom.Triangle;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
 
-public class EarClipper {
+public class EarClipperO {
     private final GeometryFactory gf;
     private final Polygon inputPolygon;
     private PreparedGeometry inputPrepGeom;
@@ -37,7 +37,7 @@ public class EarClipper {
      * 
      * @param inputPolygon the input polygon
      */
-    public EarClipper(Polygon inputPolygon) {
+    public EarClipperO(Polygon inputPolygon) {
         gf = new GeometryFactory();
         this.inputPolygon = inputPolygon;
     }
